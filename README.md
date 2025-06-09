@@ -24,6 +24,8 @@ pip install dlib
 
 :: Download the .dat model from:
    http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2
+:: Download audio files from here:
+   https://www.transfernow.net/dl/20250609ugHMMvjv
 :: Extract the file and place it in the project folder.
 
 :: 6. Run the Python script
