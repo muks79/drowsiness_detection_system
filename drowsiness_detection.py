@@ -9,6 +9,7 @@ from imutils import face_utils
 from pygame import mixer
 import os
 
+# EAR/MAR Functions
 def eye_aspect_ratio(eye):
     A = distance.euclidean(eye[1], eye[5])
     B = distance.euclidean(eye[2], eye[4])
@@ -21,6 +22,7 @@ def mouth_aspect_ratio(mouth):
     C = distance.euclidean(mouth[0], mouth[6])
     return (A + B) / (2.0 * C)
 
+# Drowsiness Detection Class
 class DrowsinessDetection:
     def __init__(self, shape_predictor, alert_sound, absence_sound):
         self.running = False
@@ -43,7 +45,6 @@ class DrowsinessDetection:
         while self.running:
             ret, frame = cap.read()
             if not ret:
-                print("Webcam not accessible.")
                 break
 
             frame = imutils.resize(frame, width=900)
@@ -58,9 +59,9 @@ class DrowsinessDetection:
                     if not self.alert_playing:
                         self.absence_alert.play()
                         self.alert_playing = True
-                else:
-                    absence_flag = 0
-                    self.alert_playing = False
+            else:
+                absence_flag = 0
+                self.alert_playing = False
 
             for subject in subjects:
                 shape = self.predictor(gray, subject)
@@ -74,10 +75,6 @@ class DrowsinessDetection:
                 cv2.drawContours(frame, [cv2.convexHull(left_eye)], -1, (0, 255, 0), 1)
                 cv2.drawContours(frame, [cv2.convexHull(right_eye)], -1, (0, 255, 0), 1)
                 cv2.drawContours(frame, [cv2.convexHull(mouth)], -1, (255, 0, 0), 1)
-
-                x, y = subject.left(), subject.top()
-                cv2.putText(frame, user_name, (x, y - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
                 if ear < config["ear_threshold"]:
                     drowsy_flag += 1
@@ -100,12 +97,77 @@ class DrowsinessDetection:
         cap.release()
         cv2.destroyAllWindows()
 
+# GUI with Login
+class LoginPage:
+    def __init__(self, root, on_success):
+        self.root = root
+        self.on_success = on_success
+        root.title("Login")
+        root.geometry("300x200")
+        tk.Label(root, text="Username").pack(pady=5)
+        self.username = tk.Entry(root)
+        self.username.pack(pady=5)
+        tk.Label(root, text="Password").pack(pady=5)
+        self.password = tk.Entry(root, show="*")
+        self.password.pack(pady=5)
+        tk.Button(root, text="Login", command=self.check_login).pack(pady=10)
+
+    def check_login(self):
+        if self.username.get() == "admin" and self.password.get() == "password":
+            self.root.destroy()
+            self.on_success()
+        else:
+            messagebox.showerror("Login Failed", "Invalid username or password.")
+
+class App:
+    def __init__(self, root):
+        self.root = root
+        root.title("Drowsiness Detection")
+        root.geometry("400x300")
+
+        self.config = {
+            "ear_threshold": 0.25,
+            "yawn_threshold": 0.75,
+            "frame_check": 20,
+            "absence_threshold": 30
+        }
+
+        self.detection = None
+
+        tk.Label(root, text="EAR Threshold").pack(pady=5)
+        self.ear_slider = ttk.Scale(root, from_=0.1, to=0.5, value=0.25, orient="horizontal")
+        self.ear_slider.pack(pady=5)
+
+        tk.Label(root, text="Frame Check").pack(pady=5)
+        self.frame_slider = ttk.Scale(root, from_=10, to=50, value=20, orient="horizontal")
+        self.frame_slider.pack(pady=5)
+
+        tk.Button(root, text="Start Detection", command=self.start_detection).pack(pady=10)
+        tk.Button(root, text="Stop Detection", command=self.stop_detection).pack(pady=5)
+
+    def start_detection(self):
+        if not all(os.path.exists(p) for p in ["shape_predictor_68_face_landmarks.dat", "alert.mp3", "absence.wav"]):
+            messagebox.showerror("Missing Files", "Required files not found in project folder.")
+            return
+
+        self.config["ear_threshold"] = self.ear_slider.get()
+        self.config["frame_check"] = int(self.frame_slider.get())
+
+        self.detection = DrowsinessDetection("shape_predictor_68_face_landmarks.dat", "alert.mp3", "absence.wav")
+
+        threading.Thread(target=self.detection.start_detection, args=(self.config,), daemon=True).start()
+
+    def stop_detection(self):
+        if self.detection:
+            self.detection.running = False
+
+# Launch app
 if __name__ == "__main__":
-    detector = DrowsinessDetection("shape_predictor_68_face_landmarks.dat", "alert.mp3", "absence.wav")
-    config = {
-        "ear_threshold": 0.25,
-        "yawn_threshold": 0.75,
-        "frame_check": 20,
-        "absence_threshold": 30
-    }
-    detector.start_detection(config)
+    def run_main_app():
+        main_root = tk.Tk()
+        App(main_root)
+        main_root.mainloop()
+
+    login_root = tk.Tk()
+    LoginPage(login_root, run_main_app)
+    login_root.mainloop()
